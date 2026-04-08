@@ -18,6 +18,11 @@ public enum DeviceType {
         return name().toLowerCase();
     }
 
+    /** Builds the full MQTT topic: {@code {type}/{roomId}/{normalizedName}}. */
+    public String buildTopic(Long roomId, String deviceName) {
+        return topicPrefix() + "/" + roomId + "/" + deviceName.toLowerCase().replace(' ', '_');
+    }
+
     /** Whether this device type stores time-series readings. */
     public boolean hasReadings() {
         return this == TEMPERATURE || this == THERMOSTAT || this == LUX || this == ENERGY;

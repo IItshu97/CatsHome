@@ -60,7 +60,7 @@ public class DeviceService {
         device.setDimmer(req.isDimmer() != null && req.isDimmer());
         device.setRoom(room);
         device.setIpAddress(req.ipAddress());
-        device.setMqttTopic(buildTopic(req.deviceType(), room.getId(), req.name()));
+        device.setMqttTopic(req.deviceType().buildTopic(room.getId(), req.name()));
         return DeviceResponse.from(deviceRepo.save(device));
     }
 
@@ -88,7 +88,7 @@ public class DeviceService {
         device.setName(req.name());
         device.setRoom(room);
         device.setIpAddress(req.ipAddress());
-        device.setMqttTopic(buildTopic(device.getDeviceType(), room.getId(), req.name()));
+        device.setMqttTopic(device.getDeviceType().buildTopic(room.getId(), req.name()));
         return DeviceResponse.from(deviceRepo.save(device));
     }
 
@@ -178,10 +178,6 @@ public class DeviceService {
 
     Device getOrThrow(Long id) {
         return deviceRepo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Device", id));
-    }
-
-    static String buildTopic(DeviceType type, Long roomId, String name) {
-        return type.topicPrefix() + "/" + roomId + "/" + name.toLowerCase().replace(' ', '_');
     }
 
     private void validateLightCommand(String command, boolean isDimmer) {

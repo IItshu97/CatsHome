@@ -50,14 +50,14 @@ All endpoints are under `/api/v1` (the servlet context-path in `application.yml`
 - `GET /api/v1/devices/alarms`
 
 ### Unified device model
-
+2
 All 11 device types (`LIGHT`, `DOOR`, `WINDOW`, `TEMPERATURE`, `MOTION`, `SMOKE`, `SHUTTER`, `THERMOSTAT`, `FLOOD`, `LUX`, `ENERGY`) live in a single `devices` table. `DeviceType` enum drives routing everywhere. The `is_dimmer` boolean distinguishes relay from PWM dimmer (both have `device_type = LIGHT`).
 
 `state_json` (TEXT) stores the last known state as a device-type-specific JSON blob. `DeviceResponse` deserializes it to `Map<String, Object>` for the API response.
 
 ### MQTT topic generation
 
-Auto-generated on registration: `{deviceType.topicPrefix()}/{room.id}/{normalizedName}` where name is lowercased with spaces → underscores. Uniqueness is enforced by a `UNIQUE (device_type, room_id, name)` constraint and a pre-save check in `DeviceService`.
+Auto-generated on registration: `{deviceType.buildTopic(roomId, name)}` — lowercased, spaces → underscores, format `{type}/{roomId}/{name}`. The `buildTopic` method lives on `DeviceType` enum. Uniqueness is enforced by a `UNIQUE (device_type, room_id, name)` DB constraint and a pre-save check in `DeviceService`.
 
 ### Persistence
 
@@ -73,6 +73,27 @@ Auto-generated on registration: `{deviceType.topicPrefix()}/{room.id}/{normalize
 - `MethodArgumentNotValidException` → 400 with field-level errors
 
 All use RFC 7807 `ProblemDetail` format.
+
+## Tests
+
+Three layers, all in `src/test/java/com/catshome/smarthome/`:
+
+| Layer | Location | What it covers |
+|---|---|---|
+| **Unit** | `unit/` | `DeviceTypeTest`, `DeviceServiceTest`, `RoomServiceTest` — pure JUnit 5 + Mockito, no Spring context |
+| **Integration** | `integration/` | `DeviceRepositoryIT`, `RoomRepositoryIT`, `SensorReadingRepositoryIT` — `@DataJpaTest` + Testcontainers PostgreSQL |
+| **System** | `system/` | `RoomControllerSystemTest`, `DeviceControllerSystemTest` — `@SpringBootTest` + MockMvc, full HTTP stack |
+
+Integration and system tests share a single PostgreSQL container via `AbstractContainerTest` — singleton pattern using a static initializer block (`POSTGRES.start()` in `static {}`). The container starts once per JVM; Testcontainers registers a shutdown hook to clean it up. `@DynamicPropertySource` overrides `spring.datasource.*` so the test context always uses the container's dynamic port regardless of `application.yml`.
+
+> **Note:** Testcontainers is pinned to **1.21.4** in `pom.xml` (overriding Spring Boot BOM's 1.20.x) because Docker Engine 29+ dropped support for API versions below 1.40, and docker-java 3.4.x (bundled in 1.20.x) hardcodes API 1.32.
+
+```bash
+mvn test                                          # all tests
+mvn test -Dtest="DeviceTypeTest,RoomServiceTest"  # unit only (no DB needed)
+mvn test -Dtest="*IT"                             # integration tests only
+mvn test -Dtest="*SystemTest"                     # system tests only
+```
 
 ## Planned / Not Yet Implemented
 
