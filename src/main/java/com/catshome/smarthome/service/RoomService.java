@@ -52,13 +52,11 @@ public class RoomService {
 
     @Transactional
     public void delete(Long id) {
-        if (!repo.existsById(id)) {
-            throw new ResourceNotFoundException("Room", id);
-        }
+        if (!repo.existsById(id)) throw new ResourceNotFoundException("Room", id);
         repo.deleteById(id);
     }
 
-    Room getOrThrow(Long id) {
+    private Room getOrThrow(Long id) {
         return repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Room", id));
     }
 }

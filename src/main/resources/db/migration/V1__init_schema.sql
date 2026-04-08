@@ -5,52 +5,42 @@ CREATE TABLE rooms (
     updated_at TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-CREATE TABLE lights (
-    id         BIGSERIAL PRIMARY KEY,
-    name       VARCHAR(255) NOT NULL UNIQUE,
-    address    VARCHAR(255) NOT NULL UNIQUE,
-    topic      VARCHAR(255) NOT NULL UNIQUE,
-    state      VARCHAR(10)  NOT NULL DEFAULT 'off',
-    room_id    BIGINT       NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+CREATE TABLE devices (
+    id               BIGSERIAL    PRIMARY KEY,
+    name             VARCHAR(100) NOT NULL,
+    device_type      VARCHAR(20)  NOT NULL,
+    is_dimmer        BOOLEAN      NOT NULL DEFAULT false,
+    room_id          BIGINT       NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    ip_address       VARCHAR(45)  NOT NULL UNIQUE,
+    mqtt_topic       VARCHAR(255) NOT NULL UNIQUE,
+    online           BOOLEAN      NOT NULL DEFAULT false,
+    last_seen        TIMESTAMPTZ,
+    state_json       TEXT,
+    firmware_version VARCHAR(20),
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_device_type_room_name UNIQUE (device_type, room_id, name)
 );
 
-CREATE TABLE door_sensors (
-    id         BIGSERIAL PRIMARY KEY,
-    name       VARCHAR(255) NOT NULL UNIQUE,
-    address    VARCHAR(255) NOT NULL UNIQUE,
-    topic      VARCHAR(255) NOT NULL UNIQUE,
-    state      VARCHAR(10)  NOT NULL DEFAULT 'closed',
-    room_id    BIGINT       NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+-- Time-series readings: temperature, thermostat, lux, energy
+CREATE TABLE sensor_readings (
+    id        BIGSERIAL   PRIMARY KEY,
+    device_id BIGINT      NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload   TEXT        NOT NULL
 );
 
-CREATE TABLE window_sensors (
-    id         BIGSERIAL PRIMARY KEY,
-    name       VARCHAR(255) NOT NULL UNIQUE,
-    address    VARCHAR(255) NOT NULL UNIQUE,
-    topic      VARCHAR(255) NOT NULL UNIQUE,
-    state      VARCHAR(10)  NOT NULL DEFAULT 'closed',
-    room_id    BIGINT       NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+-- State-change log: light, door, window, motion, smoke, flood, shutter
+CREATE TABLE device_state_log (
+    id        BIGSERIAL    PRIMARY KEY,
+    device_id BIGINT       NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    timestamp TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    old_value VARCHAR(255),
+    new_value VARCHAR(255) NOT NULL
 );
 
-CREATE TABLE temperature_sensors (
-    id          BIGSERIAL PRIMARY KEY,
-    name        VARCHAR(255)     NOT NULL UNIQUE,
-    address     VARCHAR(255)     NOT NULL UNIQUE,
-    topic       VARCHAR(255)     NOT NULL UNIQUE,
-    temperature DOUBLE PRECISION,
-    humidity    DOUBLE PRECISION,
-    room_id     BIGINT           NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-    created_at  TIMESTAMPTZ      NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ      NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_lights_room_id             ON lights(room_id);
-CREATE INDEX idx_door_sensors_room_id       ON door_sensors(room_id);
-CREATE INDEX idx_window_sensors_room_id     ON window_sensors(room_id);
-CREATE INDEX idx_temperature_sensors_room_id ON temperature_sensors(room_id);
+CREATE INDEX idx_devices_room_id          ON devices(room_id);
+CREATE INDEX idx_devices_device_type      ON devices(device_type);
+CREATE INDEX idx_sensor_readings_device_ts ON sensor_readings(device_id, timestamp DESC);
+CREATE INDEX idx_state_log_device_ts      ON device_state_log(device_id, timestamp DESC);
