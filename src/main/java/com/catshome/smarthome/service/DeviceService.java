@@ -16,16 +16,16 @@ import java.util.List;
 public class DeviceService {
 
     private final DeviceRepository deviceRepo;
-    private final SensorReadingRepository readingRepo;
+    private final SensorReadingStore influxReadingRepo;
     private final DeviceStateLogRepository stateLogRepo;
     private final RoomRepository roomRepo;
 
     public DeviceService(DeviceRepository deviceRepo,
-                         SensorReadingRepository readingRepo,
+                         SensorReadingStore influxReadingRepo,
                          DeviceStateLogRepository stateLogRepo,
                          RoomRepository roomRepo) {
         this.deviceRepo = deviceRepo;
-        this.readingRepo = readingRepo;
+        this.influxReadingRepo = influxReadingRepo;
         this.stateLogRepo = stateLogRepo;
         this.roomRepo = roomRepo;
     }
@@ -105,13 +105,13 @@ public class DeviceService {
         return stateLogRepo.findByDeviceIdAndTimestampBetweenOrderByTimestampDesc(id, from, to);
     }
 
-    public List<SensorReading> getReadings(Long id, Instant from, Instant to) {
+    public List<SensorReadingPoint> getReadings(Long id, Instant from, Instant to) {
         Device device = getOrThrow(id);
         if (!device.getDeviceType().hasReadings()) {
             throw new InvalidOperationException(
                     device.getDeviceType() + " does not produce sensor readings");
         }
-        return readingRepo.findByDeviceIdAndTimestampBetweenOrderByTimestampDesc(id, from, to);
+        return influxReadingRepo.findByDeviceIdBetween(id, from, to);
     }
 
     // ── Alarms ────────────────────────────────────────────────────────────────

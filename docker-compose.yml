@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: smarthomedb
+      POSTGRES_USER: ${DB_USERNAME:-smarthome}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-smarthome}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-smarthome} -d smarthomedb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminpassword
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-catshome}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-smarthome}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-my-admin-token}
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/smarthomedb
+      DB_USERNAME: ${DB_USERNAME:-smarthome}
+      DB_PASSWORD: ${DB_PASSWORD:-smarthome}
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-my-admin-token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-catshome}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-smarthome}
+    depends_on:
+      db:
+        condition: service_healthy
+      influxdb:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  influxdb_data:

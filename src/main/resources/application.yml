@@ -2,8 +2,12 @@ spring:
   application:
     name: catshome-smarthome
 
+  threads:
+    virtual:
+      enabled: true
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/smarthomedb
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/smarthomedb}
     username: ${DB_USERNAME:smarthome}
     password: ${DB_PASSWORD:smarthome}
 
@@ -23,3 +27,30 @@ server:
   port: 8080
   servlet:
     context-path: /api/v1
+
+influxdb:
+  url: ${INFLUXDB_URL:http://localhost:8086}
+  token: ${INFLUXDB_TOKEN:my-admin-token}
+  org: ${INFLUXDB_ORG:catshome}
+  bucket: ${INFLUXDB_BUCKET:smarthome}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  paths-to-exclude: /actuator/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true

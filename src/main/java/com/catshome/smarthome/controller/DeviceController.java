@@ -3,7 +3,6 @@ package com.catshome.smarthome.controller;
 import com.catshome.smarthome.dto.*;
 import com.catshome.smarthome.entity.DeviceStateLog;
 import com.catshome.smarthome.entity.DeviceType;
-import com.catshome.smarthome.entity.SensorReading;
 import com.catshome.smarthome.service.DeviceService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -98,7 +97,7 @@ public class DeviceController {
     }
 
     @GetMapping("/{id}/readings")
-    public List<SensorReading> getReadings(
+    public List<SensorReadingPoint> getReadings(
             @PathVariable Long id,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {

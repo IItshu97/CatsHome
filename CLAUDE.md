@@ -61,7 +61,7 @@ Auto-generated on registration: `{deviceType.buildTopic(roomId, name)}` — lowe
 
 ### Persistence
 
-- `sensor_readings` — time-series payload blobs for TEMPERATURE, THERMOSTAT, LUX, ENERGY (checked via `DeviceType.hasReadings()`).
+- `sensor_readings` — **usunięte** (Flyway V2), zastąpione przez InfluxDB.
 - `device_state_log` — old/new value log for state-change devices (LIGHT, DOOR, WINDOW, MOTION, SMOKE, FLOOD, SHUTTER).
 
 ### Error handling
@@ -81,7 +81,7 @@ Three layers, all in `src/test/java/com/catshome/smarthome/`:
 | Layer | Location | What it covers |
 |---|---|---|
 | **Unit** | `unit/` | `DeviceTypeTest`, `DeviceServiceTest`, `RoomServiceTest` — pure JUnit 5 + Mockito, no Spring context |
-| **Integration** | `integration/` | `DeviceRepositoryIT`, `RoomRepositoryIT`, `SensorReadingRepositoryIT` — `@DataJpaTest` + Testcontainers PostgreSQL |
+| **Integration** | `integration/` | `DeviceRepositoryIT`, `RoomRepositoryIT`, `DeviceStateLogRepositoryIT` — `@DataJpaTest` + Testcontainers PostgreSQL; `InfluxSensorReadingRepositoryIT` — bezpośrednie testy repozytorium InfluxDB |
 | **System** | `system/` | `RoomControllerSystemTest`, `DeviceControllerSystemTest` — `@SpringBootTest` + MockMvc, full HTTP stack |
 
 Integration and system tests share a single PostgreSQL container via `AbstractContainerTest` — singleton pattern using a static initializer block (`POSTGRES.start()` in `static {}`). The container starts once per JVM; Testcontainers registers a shutdown hook to clean it up. `@DynamicPropertySource` overrides `spring.datasource.*` so the test context always uses the container's dynamic port regardless of `application.yml`.
@@ -95,11 +95,53 @@ mvn test -Dtest="*IT"                             # integration tests only
 mvn test -Dtest="*SystemTest"                     # system tests only
 ```
 
+## InfluxDB
+
+Time-series store dla odczytów sensorów (TEMPERATURE, THERMOSTAT, LUX, ENERGY — `DeviceType.hasReadings()`).
+
+- Measurement: `sensor_reading`, tagi: `device_id`, `device_type`, `room_id`, pole: `payload` (JSON string)
+- Zapis: `InfluxSensorReadingRepository.save()` — wywoływany przez przyszłą integrację MQTT
+- Odczyt: `GET /devices/{id}/readings?from=...&to=...` → `List<SensorReadingPoint>`
+- Interfejs `SensorReadingStore` pozwala mockować repozytorium w testach jednostkowych
+
+Konfiguracja (env vars z domyślnymi):
+- `INFLUXDB_URL` — domyślnie `http://localhost:8086`
+- `INFLUXDB_TOKEN` — domyślnie `my-admin-token`
+- `INFLUXDB_ORG` — domyślnie `catshome`
+- `INFLUXDB_BUCKET` — domyślnie `smarthome`
+
+## Docker
+
+```bash
+# Local dev (x86)
+docker compose up --build
+
+# Multi-arch build for Raspberry Pi (ARM64) — requires buildx
+docker buildx build --platform linux/amd64,linux/arm64 -t catshome-smarthome:latest .
+```
+
+Konfiguracja przez env vars (z domyślnymi dla local dev):
+- `DB_URL` — domyślnie `jdbc:postgresql://localhost:5432/smarthomedb`
+- `DB_USERNAME` — domyślnie `smarthome`
+- `DB_PASSWORD` — domyślnie `smarthome`
+
+## Observability
+
+Actuator endpoints exposed at `/actuator` (outside the `/api/v1` context-path):
+- `GET /actuator/health` — app + DB health, details always shown
+- `GET /actuator/metrics` — Micrometer metrics
+- `GET /actuator/prometheus` — Prometheus scrape endpoint
+
+Swagger UI: `http://localhost:8080/api/v1/swagger-ui.html`
+OpenAPI JSON: `http://localhost:8080/api/v1/api-docs`
+
 ## Planned / Not Yet Implemented
 
 - MQTT broker integration — `DeviceService` command methods throw 422 with "MQTT not yet integrated" until this is added. Subscribe patterns: `+/+/+` (state), `+/+/+/status` (LWT), `+/+/+/state` (shutter), `+/+/+/raw` (smoke).
+- SSE / WebSockets — real-time push to Angular frontend (after MQTT integration).
 - Device provisioning — HTTP POST to `http://{ip}/config/set` on register/update.
 - Device health polling — `GET http://{ip}/health` every 60 s.
 - Priority alarm push notifications (smoke, flood → FCM).
+- Dockerfile + docker-compose with ARM64 support (target: Raspberry Pi).
 - Authentication / JWT.
 - Rate limiting.

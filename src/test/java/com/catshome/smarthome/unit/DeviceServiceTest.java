@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
 class DeviceServiceTest {
 
     @Mock DeviceRepository deviceRepo;
-    @Mock SensorReadingRepository readingRepo;
+    @Mock SensorReadingStore influxReadingRepo;
     @Mock DeviceStateLogRepository stateLogRepo;
     @Mock RoomRepository roomRepo;
 
@@ -239,18 +239,17 @@ class DeviceServiceTest {
     }
 
     @Test
-    void getReadings_delegatesToRepoForTemperatureSensor() {
+    void getReadings_delegatesToInfluxRepoForTemperatureSensor() {
         Device sensor = device(2L, "temp1", DeviceType.TEMPERATURE, "1.1.1.2", room);
         Instant from = Instant.now().minusSeconds(3600);
         Instant to = Instant.now();
         when(deviceRepo.findById(2L)).thenReturn(Optional.of(sensor));
-        when(readingRepo.findByDeviceIdAndTimestampBetweenOrderByTimestampDesc(2L, from, to))
-                .thenReturn(List.of());
+        when(influxReadingRepo.findByDeviceIdBetween(2L, from, to)).thenReturn(List.of());
 
-        List<SensorReading> result = service.getReadings(2L, from, to);
+        List<SensorReadingPoint> result = service.getReadings(2L, from, to);
 
         assertTrue(result.isEmpty());
-        verify(readingRepo).findByDeviceIdAndTimestampBetweenOrderByTimestampDesc(2L, from, to);
+        verify(influxReadingRepo).findByDeviceIdBetween(2L, from, to);
     }
 
     // ── getActiveAlarms ───────────────────────────────────────────────────────
