@@ -7,15 +7,13 @@ pipeline {
     }
 
     environment {
-        GITEA_URL = 'gitea:3000'
+        DOCKER_REGISTRY_URL = 'registry:5000'
 
         IMAGE_NAME = 'user/spring-boot-app'
         IMAGE_TAG = "${env.BUILD_ID}"
-        FULL_IMAGE_PATH = "${GITEA_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+        FULL_IMAGE_PATH = "${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
 
         DOCKER_HOST = "unix:///var/run/docker.sock"
-
-        REGISTRY_CREDS_ID = 'gitea-registry-creds'
     }
 
     stages {
@@ -55,10 +53,10 @@ pipeline {
             }
         }
 
-        stage('Push to Gitea Registry') {
+        stage('Deploy to Docker Registry') {
             steps {
                 script {
-                    docker.withRegistry("http://${GITEA_URL}", "${REGISTRY_CREDS_ID}") {
+                    docker.withRegistry("http://${DOCKER_REGISTRY_URL}") {
                         dockerImage.push()
                         dockerImage.push('latest')
                     }
@@ -69,7 +67,7 @@ pipeline {
 
     post {
         success {
-            echo "Success! Image ${FULL_IMAGE_PATH} is available in Gitea Container Registry."
+            echo "Success! Image ${FULL_IMAGE_PATH} is available in Docker Registry."
         }
         failure {
             echo "Failure! Check logs."
