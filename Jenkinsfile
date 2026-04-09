@@ -27,7 +27,7 @@ pipeline {
 
         stage('Build & Unit Tests') {
             steps {
-                sh 'mvn clean compile test'
+                sh 'mvn clean test -Dexcludes="**/*IT.java,**/*SystemTest.java"'
             }
             post {
                 always {
@@ -38,11 +38,11 @@ pipeline {
 
         stage('Integration & System Tests') {
             steps {
-                sh 'mvn verify -DskipUnitTests'
+                sh 'mvn test -Dtest="*IT,*SystemTest"'
             }
             post {
                 always {
-                    junit '**/target/failsafe-reports/*.xml'
+                    junit '**/target/surefire-reports/*.xml'
                 }
             }
         }
