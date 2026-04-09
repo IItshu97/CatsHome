@@ -18,9 +18,12 @@ public enum DeviceType {
         return name().toLowerCase();
     }
 
-    /** Builds the full MQTT topic: {@code {type}/{roomId}/{normalizedName}}. */
-    public String buildTopic(Long roomId, String deviceName) {
-        return topicPrefix() + "/" + roomId + "/" + deviceName.toLowerCase().replace(' ', '_');
+    /**
+     * Builds the MQTT topic: {@code {type}/{normalizedName}}.
+     * Room ID is not encoded in the topic — room assignment lives exclusively in the server DB.
+     */
+    public String buildTopic(String deviceName) {
+        return topicPrefix() + "/" + deviceName.toLowerCase().replace(' ', '_');
     }
 
     /** Whether this device type stores time-series readings. */
