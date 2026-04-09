@@ -5,6 +5,7 @@ import com.catshome.smarthome.entity.*;
 import com.catshome.smarthome.exception.DuplicateResourceException;
 import com.catshome.smarthome.exception.InvalidOperationException;
 import com.catshome.smarthome.exception.ResourceNotFoundException;
+import com.catshome.smarthome.mqtt.MqttPublisher;
 import com.catshome.smarthome.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,15 +20,18 @@ public class DeviceService {
     private final SensorReadingStore influxReadingRepo;
     private final DeviceStateLogRepository stateLogRepo;
     private final RoomRepository roomRepo;
+    private final MqttPublisher mqttPublisher;
 
     public DeviceService(DeviceRepository deviceRepo,
                          SensorReadingStore influxReadingRepo,
                          DeviceStateLogRepository stateLogRepo,
-                         RoomRepository roomRepo) {
+                         RoomRepository roomRepo,
+                         MqttPublisher mqttPublisher) {
         this.deviceRepo = deviceRepo;
         this.influxReadingRepo = influxReadingRepo;
         this.stateLogRepo = stateLogRepo;
         this.roomRepo = roomRepo;
+        this.mqttPublisher = mqttPublisher;
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -129,13 +133,18 @@ public class DeviceService {
     public void sendCommand(Long id, CommandRequest req) {
         Device device = getOrThrow(id);
         switch (device.getDeviceType()) {
-            case LIGHT -> validateLightCommand(req.command(), device.isDimmer());
-            case SHUTTER -> validateShutterCommand(req.command());
+            case LIGHT -> {
+                validateLightCommand(req.command(), device.isDimmer());
+                // Firmware uses "1"/"0"; REST API uses "on"/"off"
+                mqttPublisher.publish(device.getMqttTopic(), "on".equals(req.command()) ? "1" : "0");
+            }
+            case SHUTTER -> {
+                validateShutterCommand(req.command());
+                mqttPublisher.publish(device.getMqttTopic() + "/command", req.command());
+            }
             default -> throw new InvalidOperationException(
                     device.getDeviceType() + " does not support /command");
         }
-        // TODO: publish via MQTT when broker integration is added
-        throw new InvalidOperationException("MQTT not yet integrated — command accepted but not published");
     }
 
     public void sendBrightness(Long id, BrightnessRequest req) {
@@ -143,8 +152,7 @@ public class DeviceService {
         if (device.getDeviceType() != DeviceType.LIGHT || !device.isDimmer()) {
             throw new InvalidOperationException("Only dimmer lights support /brightness");
         }
-        // TODO: publish via MQTT
-        throw new InvalidOperationException("MQTT not yet integrated");
+        mqttPublisher.publish(device.getMqttTopic(), String.valueOf(req.value()));
     }
 
     public void sendPosition(Long id, PositionRequest req) {
@@ -152,8 +160,7 @@ public class DeviceService {
         if (device.getDeviceType() != DeviceType.SHUTTER) {
             throw new InvalidOperationException("Only shutters support /position");
         }
-        // TODO: publish via MQTT
-        throw new InvalidOperationException("MQTT not yet integrated");
+        mqttPublisher.publish(device.getMqttTopic() + "/position", String.valueOf(req.position()));
     }
 
     public void sendThermostatSettings(Long id, ThermostatRequest req) {
@@ -161,8 +168,8 @@ public class DeviceService {
         if (device.getDeviceType() != DeviceType.THERMOSTAT) {
             throw new InvalidOperationException("Only thermostats support /thermostat");
         }
-        // TODO: publish via MQTT
-        throw new InvalidOperationException("MQTT not yet integrated");
+        String payload = "{\"target\":" + req.target() + ",\"mode\":\"" + req.mode() + "\"}";
+        mqttPublisher.publish(device.getMqttTopic() + "/set", payload);
     }
 
     public void resetEnergy(Long id) {
@@ -170,8 +177,7 @@ public class DeviceService {
         if (device.getDeviceType() != DeviceType.ENERGY) {
             throw new InvalidOperationException("Only energy meters support /reset_energy");
         }
-        // TODO: publish via MQTT
-        throw new InvalidOperationException("MQTT not yet integrated");
+        mqttPublisher.publish(device.getMqttTopic() + "/reset_energy", "reset");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import com.catshome.smarthome.entity.*;
 import com.catshome.smarthome.exception.DuplicateResourceException;
 import com.catshome.smarthome.exception.InvalidOperationException;
 import com.catshome.smarthome.exception.ResourceNotFoundException;
+import com.catshome.smarthome.mqtt.MqttPublisher;
 import com.catshome.smarthome.repository.*;
 import com.catshome.smarthome.service.DeviceService;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +33,7 @@ class DeviceServiceTest {
     @Mock SensorReadingStore influxReadingRepo;
     @Mock DeviceStateLogRepository stateLogRepo;
     @Mock RoomRepository roomRepo;
+    @Mock MqttPublisher mqttPublisher;
 
     @InjectMocks DeviceService service;
 
@@ -292,16 +294,26 @@ class DeviceServiceTest {
 
     @Nested
     class SendCommand {
-        @ParameterizedTest
-        @ValueSource(strings = {"on", "off"})
-        void relayLight_validCommands_throwsMqttNotIntegrated(String command) {
+        @Test
+        void relayLight_onCommand_publishesOne() {
             Device relay = device(1L, "lamp", DeviceType.LIGHT, "1.1.1.1", room);
             relay.setDimmer(false);
             when(deviceRepo.findById(1L)).thenReturn(Optional.of(relay));
 
-            InvalidOperationException ex = assertThrows(InvalidOperationException.class,
-                    () -> service.sendCommand(1L, new CommandRequest(command)));
-            assertTrue(ex.getMessage().contains("MQTT not yet integrated"));
+            service.sendCommand(1L, new CommandRequest("on"));
+
+            verify(mqttPublisher).publish("light/3/lamp", "1");
+        }
+
+        @Test
+        void relayLight_offCommand_publishesZero() {
+            Device relay = device(1L, "lamp", DeviceType.LIGHT, "1.1.1.1", room);
+            relay.setDimmer(false);
+            when(deviceRepo.findById(1L)).thenReturn(Optional.of(relay));
+
+            service.sendCommand(1L, new CommandRequest("off"));
+
+            verify(mqttPublisher).publish("light/3/lamp", "0");
         }
 
         @Test
@@ -313,6 +325,7 @@ class DeviceServiceTest {
             InvalidOperationException ex = assertThrows(InvalidOperationException.class,
                     () -> service.sendCommand(1L, new CommandRequest("toggle")));
             assertTrue(ex.getMessage().contains("'on' or 'off'"));
+            verifyNoInteractions(mqttPublisher);
         }
 
         @Test
@@ -324,17 +337,18 @@ class DeviceServiceTest {
             InvalidOperationException ex = assertThrows(InvalidOperationException.class,
                     () -> service.sendCommand(1L, new CommandRequest("on")));
             assertTrue(ex.getMessage().contains("/brightness"));
+            verifyNoInteractions(mqttPublisher);
         }
 
         @ParameterizedTest
         @ValueSource(strings = {"open", "close", "stop"})
-        void shutter_validCommands_throwsMqttNotIntegrated(String command) {
+        void shutter_validCommands_publishToCommandSubTopic(String command) {
             Device shutter = device(1L, "roller", DeviceType.SHUTTER, "1.1.1.1", room);
             when(deviceRepo.findById(1L)).thenReturn(Optional.of(shutter));
 
-            InvalidOperationException ex = assertThrows(InvalidOperationException.class,
-                    () -> service.sendCommand(1L, new CommandRequest(command)));
-            assertTrue(ex.getMessage().contains("MQTT not yet integrated"));
+            service.sendCommand(1L, new CommandRequest(command));
+
+            verify(mqttPublisher).publish("shutter/3/roller/command", command);
         }
 
         @Test
@@ -345,6 +359,7 @@ class DeviceServiceTest {
             InvalidOperationException ex = assertThrows(InvalidOperationException.class,
                     () -> service.sendCommand(1L, new CommandRequest("raise")));
             assertTrue(ex.getMessage().contains("'open', 'close', or 'stop'"));
+            verifyNoInteractions(mqttPublisher);
         }
 
         @Test
@@ -355,10 +370,22 @@ class DeviceServiceTest {
             InvalidOperationException ex = assertThrows(InvalidOperationException.class,
                     () -> service.sendCommand(1L, new CommandRequest("open")));
             assertTrue(ex.getMessage().contains("does not support /command"));
+            verifyNoInteractions(mqttPublisher);
         }
     }
 
     // ── sendBrightness ────────────────────────────────────────────────────────
+
+    @Test
+    void sendBrightness_dimmerLight_publishesValueString() {
+        Device dimmer = device(1L, "strip", DeviceType.LIGHT, "1.1.1.1", room);
+        dimmer.setDimmer(true);
+        when(deviceRepo.findById(1L)).thenReturn(Optional.of(dimmer));
+
+        service.sendBrightness(1L, new BrightnessRequest(75));
+
+        verify(mqttPublisher).publish("light/3/strip", "75");
+    }
 
     @Test
     void sendBrightness_nonDimmerThrows() {
@@ -368,6 +395,7 @@ class DeviceServiceTest {
 
         assertThrows(InvalidOperationException.class,
                 () -> service.sendBrightness(1L, new BrightnessRequest(75)));
+        verifyNoInteractions(mqttPublisher);
     }
 
     @Test
@@ -377,9 +405,20 @@ class DeviceServiceTest {
 
         assertThrows(InvalidOperationException.class,
                 () -> service.sendBrightness(1L, new BrightnessRequest(50)));
+        verifyNoInteractions(mqttPublisher);
     }
 
     // ── sendPosition ──────────────────────────────────────────────────────────
+
+    @Test
+    void sendPosition_shutter_publishesToPositionSubTopic() {
+        Device shutter = device(1L, "roller", DeviceType.SHUTTER, "1.1.1.1", room);
+        when(deviceRepo.findById(1L)).thenReturn(Optional.of(shutter));
+
+        service.sendPosition(1L, new PositionRequest(50));
+
+        verify(mqttPublisher).publish("shutter/3/roller/position", "50");
+    }
 
     @Test
     void sendPosition_nonShutterThrows() {
@@ -388,9 +427,20 @@ class DeviceServiceTest {
 
         assertThrows(InvalidOperationException.class,
                 () -> service.sendPosition(1L, new PositionRequest(50)));
+        verifyNoInteractions(mqttPublisher);
     }
 
     // ── sendThermostatSettings ────────────────────────────────────────────────
+
+    @Test
+    void sendThermostatSettings_thermostat_publishesJsonToSetSubTopic() {
+        Device thermo = device(1L, "thermo", DeviceType.THERMOSTAT, "1.1.1.1", room);
+        when(deviceRepo.findById(1L)).thenReturn(Optional.of(thermo));
+
+        service.sendThermostatSettings(1L, new ThermostatRequest(22.0, "heat"));
+
+        verify(mqttPublisher).publish(eq("thermostat/3/thermo/set"), contains("\"target\":22.0"));
+    }
 
     @Test
     void sendThermostatSettings_nonThermostatThrows() {
@@ -399,9 +449,20 @@ class DeviceServiceTest {
 
         assertThrows(InvalidOperationException.class,
                 () -> service.sendThermostatSettings(1L, new ThermostatRequest(21.0, "heat")));
+        verifyNoInteractions(mqttPublisher);
     }
 
     // ── resetEnergy ───────────────────────────────────────────────────────────
+
+    @Test
+    void resetEnergy_energyMeter_publishesToResetSubTopic() {
+        Device meter = device(1L, "meter", DeviceType.ENERGY, "1.1.1.1", room);
+        when(deviceRepo.findById(1L)).thenReturn(Optional.of(meter));
+
+        service.resetEnergy(1L);
+
+        verify(mqttPublisher).publish("energy/3/meter/reset_energy", "reset");
+    }
 
     @Test
     void resetEnergy_nonEnergyMeterThrows() {
@@ -409,6 +470,7 @@ class DeviceServiceTest {
         when(deviceRepo.findById(1L)).thenReturn(Optional.of(light));
 
         assertThrows(InvalidOperationException.class, () -> service.resetEnergy(1L));
+        verifyNoInteractions(mqttPublisher);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

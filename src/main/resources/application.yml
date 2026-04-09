@@ -28,6 +28,12 @@ server:
   servlet:
     context-path: /api/v1
 
+mqtt:
+  broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+  client-id: ${MQTT_CLIENT_ID:catshome-server}
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
+
 influxdb:
   url: ${INFLUXDB_URL:http://localhost:8086}
   token: ${INFLUXDB_TOKEN:my-admin-token}
