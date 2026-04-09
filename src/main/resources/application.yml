@@ -28,6 +28,15 @@ server:
   servlet:
     context-path: /api/v1
 
+app:
+  default-admin-username: ${DEFAULT_ADMIN_USERNAME:admin}
+  default-admin-password: ${DEFAULT_ADMIN_PASSWORD:admin}
+
+jwt:
+  # Change JWT_SECRET in production — must be Base64-encoded, min 256 bits
+  secret: ${JWT_SECRET:dGhpcy1pcy1hLXZlcnktbG9uZy1zZWNyZXQta2V5LWZvci1kZXZlbG9wbWVudA==}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
 device-health:
   poll-interval-ms: ${DEVICE_HEALTH_POLL_INTERVAL_MS:60000}
 
