@@ -28,6 +28,9 @@ server:
   servlet:
     context-path: /api/v1
 
+device-health:
+  poll-interval-ms: ${DEVICE_HEALTH_POLL_INTERVAL_MS:60000}
+
 mqtt:
   broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
   client-id: ${MQTT_CLIENT_ID:catshome-server}

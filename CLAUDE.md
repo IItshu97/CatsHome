@@ -116,7 +116,7 @@ Three layers, all in `src/test/java/com/catshome/smarthome/`:
 
 | Layer | Location | What it covers |
 |---|---|---|
-| **Unit** | `unit/` | `DeviceTypeTest`, `DeviceServiceTest`, `RoomServiceTest` — pure JUnit 5 + Mockito, no Spring context |
+| **Unit** | `unit/` | `DeviceTypeTest`, `DeviceServiceTest`, `RoomServiceTest`, `DeviceHealthPollerTest` — pure JUnit 5 + Mockito, no Spring context |
 | **Integration** | `integration/` | `DeviceRepositoryIT`, `RoomRepositoryIT`, `DeviceStateLogRepositoryIT` — `@DataJpaTest` + Testcontainers PostgreSQL; `InfluxSensorReadingRepositoryIT` — InfluxDB repo; `MqttMessageHandlerIT` — full MQTT flow with HiveMQ container |
 | **System** | `system/` | `RoomControllerSystemTest`, `DeviceControllerSystemTest` — `@SpringBootTest` + MockMvc, full HTTP stack |
 
@@ -171,11 +171,24 @@ Actuator endpoints exposed at `/actuator` (outside the `/api/v1` context-path):
 Swagger UI: `http://localhost:8080/api/v1/swagger-ui.html`
 OpenAPI JSON: `http://localhost:8080/api/v1/api-docs`
 
+## Device Health Polling
+
+`DeviceHealthPoller` (`@Scheduled`) polls every registered device every 60 s via `GET http://{ip}/health` (ESPHome built-in `web_server` endpoint).
+
+On success: updates `firmware_version`, sets `online = true`, refreshes `last_seen`.
+On failure: logs at DEBUG and leaves `online` unchanged — MQTT LWT remains the authoritative online/offline source.
+
+- `DeviceHealthClient` — interface (`fetchHealth(ip)` → `Optional<DeviceHealthResponse>`)
+- `RestClientDeviceHealthClient` — `RestClient` impl with 5 s connect + read timeouts
+- `DeviceHealthPoller` — injects `DeviceRepository` + `DeviceHealthClient`; `@Transactional` per poll cycle
+
+Configuration:
+- `DEVICE_HEALTH_POLL_INTERVAL_MS` — default `60000`
+
 ## Planned / Not Yet Implemented
 
 - SSE / WebSockets — real-time push to frontend after state changes received via MQTT.
 - Device provisioning — HTTP POST to `http://{ip}/config/set` on register/update (sends broker IP + topic to device).
-- Device health polling — `GET http://{ip}/health` every 60 s, updates `firmware_version`.
 - Priority alarm push notifications (smoke, flood → FCM). MQTT handler logs `WARN` as placeholder.
 - Authentication / JWT.
 - Rate limiting.
