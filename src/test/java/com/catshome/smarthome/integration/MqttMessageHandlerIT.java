@@ -186,7 +186,7 @@ class MqttMessageHandlerIT extends AbstractContainerTest {
         d.setDeviceType(type);
         d.setIpAddress("192.168.1.1");
         d.setRoom(room);
-        d.setMqttTopic(type.buildTopic(room.getId(), name));
+        d.setMqttTopic(type.buildTopic(name));
         return d;
     }
 }

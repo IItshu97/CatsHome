@@ -63,6 +63,7 @@ class RoomRepositoryIT extends AbstractContainerTest {
 
         assertEquals(2, deviceRepo.count());
 
+        em.clear(); // evict devices from session before delete to avoid TransientObjectException
         roomRepo.deleteById(r.getId());
         em.flush();
         em.clear();
@@ -82,7 +83,7 @@ class RoomRepositoryIT extends AbstractContainerTest {
         d.setDeviceType(type);
         d.setIpAddress(ip);
         d.setRoom(r);
-        d.setMqttTopic(type.topicPrefix() + "/" + r.getId() + "/" + name);
+        d.setMqttTopic(type.buildTopic(name));
         return d;
     }
 

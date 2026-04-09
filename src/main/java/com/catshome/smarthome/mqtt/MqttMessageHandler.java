@@ -22,10 +22,10 @@ import java.util.Objects;
  * Processes all inbound MQTT messages and updates device state in the database.
  *
  * Routing (per device_contract.md §1.4):
- *   3-segment topic  → device state update
- *   4-segment /status → online / offline
- *   4-segment /state  → shutter position state
- *   4-segment /raw    → smoke sensor raw ADC value
+ *   2-segment topic  → device state update  ({type}/{name})
+ *   3-segment /status → online / offline
+ *   3-segment /state  → shutter position state
+ *   3-segment /raw    → smoke sensor raw ADC value
  */
 @Component
 public class MqttMessageHandler {
@@ -51,9 +51,9 @@ public class MqttMessageHandler {
     public void handle(String topic, String payload) {
         String[] segments = topic.split("/");
         switch (segments.length) {
-            case 3 -> handleStateMessage(topic, payload);
-            case 4 -> {
-                String sub = segments[3];
+            case 2 -> handleStateMessage(topic, payload);
+            case 3 -> {
+                String sub = segments[2];
                 switch (sub) {
                     case "status" -> handleStatusMessage(segments, payload);
                     case "state"  -> handleShutterState(segments, payload);
@@ -65,7 +65,7 @@ public class MqttMessageHandler {
         }
     }
 
-    // ── 3-segment: main device state ─────────────────────────────────────────
+    // ── 2-segment: main device state ─────────────────────────────────────────
 
     private void handleStateMessage(String topic, String payload) {
         deviceRepo.findByMqttTopic(topic).ifPresentOrElse(
@@ -110,7 +110,7 @@ public class MqttMessageHandler {
         deviceRepo.save(device);
     }
 
-    // ── 4-segment /status: online / offline ──────────────────────────────────
+    // ── 3-segment /status: online / offline ──────────────────────────────────
 
     private void handleStatusMessage(String[] segments, String payload) {
         String baseTopic = baseTopic(segments);
@@ -123,7 +123,7 @@ public class MqttMessageHandler {
         });
     }
 
-    // ── 4-segment /state: shutter position ───────────────────────────────────
+    // ── 3-segment /state: shutter position ───────────────────────────────────
 
     private void handleShutterState(String[] segments, String payload) {
         String baseTopic = baseTopic(segments);
@@ -151,7 +151,7 @@ public class MqttMessageHandler {
         });
     }
 
-    // ── 4-segment /raw: smoke sensor raw ADC ─────────────────────────────────
+    // ── 3-segment /raw: smoke sensor raw ADC ─────────────────────────────────
 
     private void handleSmokeRaw(String[] segments, String payload) {
         String baseTopic = baseTopic(segments);
@@ -264,6 +264,6 @@ public class MqttMessageHandler {
     }
 
     private static String baseTopic(String[] segments) {
-        return segments[0] + "/" + segments[1] + "/" + segments[2];
+        return segments[0] + "/" + segments[1];
     }
 }

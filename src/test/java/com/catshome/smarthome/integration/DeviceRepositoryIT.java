@@ -106,33 +106,31 @@ class DeviceRepositoryIT extends AbstractContainerTest {
         assertFalse(deviceRepo.existsByIpAddress("10.0.0.51"));
     }
 
-    // ── existsByDeviceTypeAndRoomIdAndName ────────────────────────────────────
+    // ── existsByDeviceTypeAndName ─────────────────────────────────────────────
 
     @Test
-    void existsByTypeRoomName_trueForExactMatch() {
+    void existsByTypeName_trueForExactMatch() {
         em.persistAndFlush(device("lamp", DeviceType.LIGHT, "10.0.0.1", living));
 
-        assertTrue(deviceRepo.existsByDeviceTypeAndRoomIdAndName(
-                DeviceType.LIGHT, living.getId(), "lamp"));
+        assertTrue(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp"));
 
         // Different type — false
-        assertFalse(deviceRepo.existsByDeviceTypeAndRoomIdAndName(
-                DeviceType.DOOR, living.getId(), "lamp"));
+        assertFalse(deviceRepo.existsByDeviceTypeAndName(DeviceType.DOOR, "lamp"));
 
-        // Different room — false
-        assertFalse(deviceRepo.existsByDeviceTypeAndRoomIdAndName(
-                DeviceType.LIGHT, bedroom.getId(), "lamp"));
+        // Different name — false
+        assertFalse(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp2"));
     }
 
     // ── unique constraints ────────────────────────────────────────────────────
 
     @Test
-    void uniqueConstraint_rejectsDeviceWithSameTypeRoomName() {
+    void uniqueConstraint_rejectsDeviceWithSameTypeNameGlobally() {
         em.persistAndFlush(device("lamp", DeviceType.LIGHT, "10.0.0.1", living));
 
-        Device duplicate = device("lamp", DeviceType.LIGHT, "10.0.0.2", living);
+        // Same type+name in a different room must also be rejected
+        Device duplicate = device("lamp", DeviceType.LIGHT, "10.0.0.2", bedroom);
         assertThrows(DataIntegrityViolationException.class,
-                () -> em.persistAndFlush(duplicate));
+                () -> deviceRepo.saveAndFlush(duplicate));
     }
 
     @Test
@@ -147,7 +145,7 @@ class DeviceRepositoryIT extends AbstractContainerTest {
         em.persistAndFlush(device("lamp",  DeviceType.LIGHT, "10.0.0.99", living));
         Device dup = device("lamp2", DeviceType.LIGHT, "10.0.0.99", bedroom);
         assertThrows(DataIntegrityViolationException.class,
-                () -> em.persistAndFlush(dup));
+                () -> deviceRepo.saveAndFlush(dup));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -164,7 +162,7 @@ class DeviceRepositoryIT extends AbstractContainerTest {
         d.setDeviceType(type);
         d.setIpAddress(ip);
         d.setRoom(r);
-        d.setMqttTopic(type.topicPrefix() + "/" + r.getId() + "/" + name);
+        d.setMqttTopic(type.buildTopic(name));
         return d;
     }
 }

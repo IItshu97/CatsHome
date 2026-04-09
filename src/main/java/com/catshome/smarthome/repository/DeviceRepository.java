@@ -26,5 +26,5 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     boolean existsByIpAddress(String ipAddress);
 
-    boolean existsByDeviceTypeAndRoomIdAndName(DeviceType deviceType, Long roomId, String name);
+    boolean existsByDeviceTypeAndName(DeviceType deviceType, String name);
 }

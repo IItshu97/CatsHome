@@ -116,7 +116,7 @@ class DeviceHealthPollerTest {
         d.setDeviceType(DeviceType.LIGHT);
         d.setIpAddress(ip);
         d.setRoom(room);
-        d.setMqttTopic(DeviceType.LIGHT.buildTopic(room.getId(), name));
+        d.setMqttTopic(DeviceType.LIGHT.buildTopic(name));
         return d;
     }
 

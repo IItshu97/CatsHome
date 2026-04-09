@@ -51,21 +51,21 @@ class DeviceServiceTest {
     @Nested
     class BuildTopic {
         @Test
-        void usesTypeRoomIdAndNormalizedName() {
-            assertEquals("light/3/lampa_salon",
-                    DeviceType.LIGHT.buildTopic(3L, "lampa salon"));
+        void usesTypeAndNormalizedName() {
+            assertEquals("light/lampa_salon",
+                    DeviceType.LIGHT.buildTopic("lampa salon"));
         }
 
         @Test
         void lowercasesName() {
-            assertEquals("door/1/front_door",
-                    DeviceType.DOOR.buildTopic(1L, "FRONT DOOR"));
+            assertEquals("door/front_door",
+                    DeviceType.DOOR.buildTopic("FRONT DOOR"));
         }
 
         @Test
         void replacesSpacesWithUnderscores() {
-            assertEquals("temperature/2/sensor_a",
-                    DeviceType.TEMPERATURE.buildTopic(2L, "sensor a"));
+            assertEquals("temperature/sensor_a",
+                    DeviceType.TEMPERATURE.buildTopic("sensor a"));
         }
     }
 
@@ -76,7 +76,7 @@ class DeviceServiceTest {
         @Test
         void happyPath_generatesTopicAndPersists() {
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(DeviceType.LIGHT, 3L, "lamp")).thenReturn(false);
+            when(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp")).thenReturn(false);
             when(deviceRepo.existsByIpAddress("192.168.1.10")).thenReturn(false);
             when(deviceRepo.save(any())).thenAnswer(inv -> {
                 Device d = inv.getArgument(0);
@@ -87,7 +87,7 @@ class DeviceServiceTest {
             DeviceResponse result = service.register(
                     new DeviceRegistrationRequest("lamp", DeviceType.LIGHT, false, 3L, "192.168.1.10"));
 
-            assertEquals("light/3/lamp", result.mqttTopic());
+            assertEquals("light/lamp", result.mqttTopic());
             assertEquals(DeviceType.LIGHT, result.deviceType());
             assertFalse(result.isDimmer());
             verify(deviceRepo).save(any());
@@ -96,7 +96,7 @@ class DeviceServiceTest {
         @Test
         void isDimmer_null_treatedAsFalse() {
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(any(), any(), any())).thenReturn(false);
+            when(deviceRepo.existsByDeviceTypeAndName(any(), any())).thenReturn(false);
             when(deviceRepo.existsByIpAddress(any())).thenReturn(false);
             when(deviceRepo.save(any())).thenAnswer(inv -> {
                 Device d = inv.getArgument(0);
@@ -122,7 +122,7 @@ class DeviceServiceTest {
         @Test
         void throwsOnDuplicateTypeRoomName() {
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(DeviceType.LIGHT, 3L, "lamp")).thenReturn(true);
+            when(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp")).thenReturn(true);
 
             assertThrows(DuplicateResourceException.class, () ->
                     service.register(new DeviceRegistrationRequest("lamp", DeviceType.LIGHT, false, 3L, "1.2.3.4")));
@@ -132,7 +132,7 @@ class DeviceServiceTest {
         @Test
         void throwsOnDuplicateIpAddress() {
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(any(), any(), any())).thenReturn(false);
+            when(deviceRepo.existsByDeviceTypeAndName(any(), any())).thenReturn(false);
             when(deviceRepo.existsByIpAddress("192.168.1.10")).thenReturn(true);
 
             assertThrows(DuplicateResourceException.class, () ->
@@ -159,22 +159,22 @@ class DeviceServiceTest {
 
             when(deviceRepo.findById(5L)).thenReturn(Optional.of(existingDevice));
             when(roomRepo.findById(7L)).thenReturn(Optional.of(newRoom));
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(DeviceType.LIGHT, 7L, "lamp")).thenReturn(false);
+            when(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp")).thenReturn(false);
             when(deviceRepo.existsByIpAddress("192.168.1.10")).thenReturn(true); // same IP, not a conflict
             when(deviceRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             DeviceResponse result = service.update(5L,
                     new DeviceUpdateRequest("lamp", 7L, "192.168.1.10"));
 
-            assertEquals("light/7/lamp", result.mqttTopic());
+            assertEquals("light/lamp", result.mqttTopic());
         }
 
         @Test
         void keepingOwnNameDoesNotThrow() {
             when(deviceRepo.findById(5L)).thenReturn(Optional.of(existingDevice));
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            // same (type, room, name) exists but it IS self
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(DeviceType.LIGHT, 3L, "lamp")).thenReturn(true);
+            // same (type, name) exists but it IS self
+            when(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp")).thenReturn(true);
             when(deviceRepo.existsByIpAddress("192.168.1.10")).thenReturn(true);
             when(deviceRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -186,9 +186,9 @@ class DeviceServiceTest {
         void throwsWhenNameTakenByAnotherDevice() {
             when(deviceRepo.findById(5L)).thenReturn(Optional.of(existingDevice));
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            // "other_lamp" exists but device's own name is "lamp" — not self
+            // "lamp2" exists but device's own name is "lamp" — not self
             Device other = device(6L, "lamp2", DeviceType.LIGHT, "192.168.1.20", room);
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(DeviceType.LIGHT, 3L, "lamp2")).thenReturn(true);
+            when(deviceRepo.existsByDeviceTypeAndName(DeviceType.LIGHT, "lamp2")).thenReturn(true);
 
             assertThrows(DuplicateResourceException.class, () ->
                     service.update(5L, new DeviceUpdateRequest("lamp2", 3L, "192.168.1.10")));
@@ -198,7 +198,7 @@ class DeviceServiceTest {
         void throwsWhenIpTakenByAnotherDevice() {
             when(deviceRepo.findById(5L)).thenReturn(Optional.of(existingDevice));
             when(roomRepo.findById(3L)).thenReturn(Optional.of(room));
-            when(deviceRepo.existsByDeviceTypeAndRoomIdAndName(any(), any(), any())).thenReturn(false);
+            when(deviceRepo.existsByDeviceTypeAndName(any(), any())).thenReturn(false);
             when(deviceRepo.existsByIpAddress("192.168.1.99")).thenReturn(true);
 
             assertThrows(DuplicateResourceException.class, () ->
@@ -302,7 +302,7 @@ class DeviceServiceTest {
 
             service.sendCommand(1L, new CommandRequest("on"));
 
-            verify(mqttPublisher).publish("light/3/lamp", "1");
+            verify(mqttPublisher).publish("light/lamp", "1");
         }
 
         @Test
@@ -313,7 +313,7 @@ class DeviceServiceTest {
 
             service.sendCommand(1L, new CommandRequest("off"));
 
-            verify(mqttPublisher).publish("light/3/lamp", "0");
+            verify(mqttPublisher).publish("light/lamp", "0");
         }
 
         @Test
@@ -348,7 +348,7 @@ class DeviceServiceTest {
 
             service.sendCommand(1L, new CommandRequest(command));
 
-            verify(mqttPublisher).publish("shutter/3/roller/command", command);
+            verify(mqttPublisher).publish("shutter/roller/command", command);
         }
 
         @Test
@@ -384,7 +384,7 @@ class DeviceServiceTest {
 
         service.sendBrightness(1L, new BrightnessRequest(75));
 
-        verify(mqttPublisher).publish("light/3/strip", "75");
+        verify(mqttPublisher).publish("light/strip", "75");
     }
 
     @Test
@@ -417,7 +417,7 @@ class DeviceServiceTest {
 
         service.sendPosition(1L, new PositionRequest(50));
 
-        verify(mqttPublisher).publish("shutter/3/roller/position", "50");
+        verify(mqttPublisher).publish("shutter/roller/position", "50");
     }
 
     @Test
@@ -439,7 +439,7 @@ class DeviceServiceTest {
 
         service.sendThermostatSettings(1L, new ThermostatRequest(22.0, "heat"));
 
-        verify(mqttPublisher).publish(eq("thermostat/3/thermo/set"), contains("\"target\":22.0"));
+        verify(mqttPublisher).publish(eq("thermostat/thermo/set"), contains("\"target\":22.0"));
     }
 
     @Test
@@ -461,7 +461,7 @@ class DeviceServiceTest {
 
         service.resetEnergy(1L);
 
-        verify(mqttPublisher).publish("energy/3/meter/reset_energy", "reset");
+        verify(mqttPublisher).publish("energy/meter/reset_energy", "reset");
     }
 
     @Test
@@ -482,7 +482,7 @@ class DeviceServiceTest {
         d.setDeviceType(type);
         d.setIpAddress(ip);
         d.setRoom(r);
-        d.setMqttTopic(type.buildTopic(r.getId(), name));
+        d.setMqttTopic(type.buildTopic(name));
         return d;
     }
 }

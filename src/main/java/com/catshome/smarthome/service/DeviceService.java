@@ -50,9 +50,9 @@ public class DeviceService {
         Room room = roomRepo.findById(req.roomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room", req.roomId()));
 
-        if (deviceRepo.existsByDeviceTypeAndRoomIdAndName(req.deviceType(), req.roomId(), req.name())) {
+        if (deviceRepo.existsByDeviceTypeAndName(req.deviceType(), req.name())) {
             throw new DuplicateResourceException(
-                    req.deviceType() + " device named '" + req.name() + "' already exists in this room");
+                    req.deviceType() + " device named '" + req.name() + "' already exists");
         }
         if (deviceRepo.existsByIpAddress(req.ipAddress())) {
             throw new DuplicateResourceException("Device with IP '" + req.ipAddress() + "' already registered");
@@ -64,7 +64,7 @@ public class DeviceService {
         device.setDimmer(req.isDimmer() != null && req.isDimmer());
         device.setRoom(room);
         device.setIpAddress(req.ipAddress());
-        device.setMqttTopic(req.deviceType().buildTopic(room.getId(), req.name()));
+        device.setMqttTopic(req.deviceType().buildTopic(req.name()));
         return DeviceResponse.from(deviceRepo.save(device));
     }
 
@@ -74,13 +74,12 @@ public class DeviceService {
         Room room = roomRepo.findById(req.roomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room", req.roomId()));
 
-        // Check name uniqueness within (type, room) excluding self
-        boolean nameConflict = deviceRepo
-                .existsByDeviceTypeAndRoomIdAndName(device.getDeviceType(), req.roomId(), req.name())
-                && !(device.getRoom().getId().equals(req.roomId()) && device.getName().equals(req.name()));
+        // Check global name uniqueness per type, excluding self
+        boolean nameConflict = deviceRepo.existsByDeviceTypeAndName(device.getDeviceType(), req.name())
+                && !device.getName().equals(req.name());
         if (nameConflict) {
             throw new DuplicateResourceException(
-                    device.getDeviceType() + " device named '" + req.name() + "' already exists in this room");
+                    device.getDeviceType() + " device named '" + req.name() + "' already exists");
         }
 
         boolean ipConflict = deviceRepo.existsByIpAddress(req.ipAddress())
@@ -92,7 +91,7 @@ public class DeviceService {
         device.setName(req.name());
         device.setRoom(room);
         device.setIpAddress(req.ipAddress());
-        device.setMqttTopic(device.getDeviceType().buildTopic(room.getId(), req.name()));
+        device.setMqttTopic(device.getDeviceType().buildTopic(req.name()));
         return DeviceResponse.from(deviceRepo.save(device));
     }
 

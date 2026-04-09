@@ -23,16 +23,16 @@ public class MqttClientWrapper implements MqttPublisher, InitializingBean {
 
     /**
      * Wildcard subscriptions per device_contract.md §4:
-     *   +/+/+         — main state updates (3-segment topics)
-     *   +/+/+/status  — LWT online/offline
-     *   +/+/+/state   — shutter position state
-     *   +/+/+/raw     — smoke sensor raw ADC (informational, QoS 0)
+     *   +/+         — main state updates (2-segment topics: {type}/{name})
+     *   +/+/status  — LWT online/offline
+     *   +/+/state   — shutter position state
+     *   +/+/raw     — smoke sensor raw ADC (informational, QoS 0)
      */
     private static final String[] SUBSCRIBE_TOPICS = {
-            "+/+/+",
-            "+/+/+/status",
-            "+/+/+/state",
-            "+/+/+/raw"
+            "+/+",
+            "+/+/status",
+            "+/+/state",
+            "+/+/raw"
     };
     private static final int[] SUBSCRIBE_QOS = {1, 1, 1, 0};
 

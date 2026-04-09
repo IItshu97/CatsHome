@@ -50,7 +50,7 @@ class DeviceControllerSystemTest extends AbstractContainerTest {
                                  "roomId":%d,"ipAddress":"192.168.1.10"}
                                 """.formatted(roomId)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.mqttTopic").value("light/" + roomId + "/lamp1"))
+                .andExpect(jsonPath("$.mqttTopic").value("light/lamp1"))
                 .andExpect(jsonPath("$.deviceType").value("LIGHT"))
                 .andExpect(jsonPath("$.isDimmer").value(false))
                 .andExpect(jsonPath("$.online").value(false));
@@ -65,7 +65,7 @@ class DeviceControllerSystemTest extends AbstractContainerTest {
                                  "roomId":%d,"ipAddress":"192.168.1.20"}
                                 """.formatted(roomId)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.mqttTopic").value("door/" + roomId + "/front_door"));
+                .andExpect(jsonPath("$.mqttTopic").value("door/front_door"));
     }
 
     @Test
@@ -213,7 +213,7 @@ class DeviceControllerSystemTest extends AbstractContainerTest {
                                 """.formatted(roomId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("new_lamp"))
-                .andExpect(jsonPath("$.mqttTopic").value("light/" + roomId + "/new_lamp"));
+                .andExpect(jsonPath("$.mqttTopic").value("light/new_lamp"));
     }
 
     @Test

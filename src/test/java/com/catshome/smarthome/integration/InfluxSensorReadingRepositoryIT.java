@@ -32,6 +32,11 @@ class InfluxSensorReadingRepositoryIT extends AbstractContainerTest {
         String url = "http://" + INFLUXDB.getHost() + ":" + INFLUXDB.getMappedPort(8086);
         client = InfluxDBClientFactory.create(url, TOKEN.toCharArray());
         repo = new InfluxSensorReadingRepository(client, ORG, BUCKET);
+        // Purge any data left by other tests (e.g. MqttMessageHandlerIT) that share the container
+        client.getDeleteApi().delete(
+                OffsetDateTime.of(2000, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.now(ZoneOffset.UTC),
+                "", BUCKET, ORG);
     }
 
     @AfterEach
